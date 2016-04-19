@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>logov18</title>
+	<link rel="stylesheet" href="../../css/canvas.css">
+</head>
+<body>
+	<canvas id="canvas"></canvas>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5.1/dat.gui.min.js"></script>
+<script>
+	//<![CDATA[
+	var gui=new dat.GUI()
+	var vetical=100
+	var horizontal=100
+	var frames=1
+	var c=document.getElementById("canvas")
+	var canvas=c.getContext("2d")
+	var cellSize=16
+	var hue=30
+	var saturation=100
+	var minLightness=50
+	var maxLightness=62
+	var checkCanvasSize=function(){
+		if(c.width!=window.innerWidth||c.height!=window.innerHeight)
+		{
+			c.width=window.innerWidth
+			c.height=window.innerHeight
+			return true
+		}
+		return false
+	}
+	var passTime=0
+	var lastTime=Date.now()
+	var checkTime=function(){
+		passTime=(Date.now()-lastTime)/800
+		lastTime=Date.now()
+	}
+	var Cell=function(){
+		this.phase=Math.random()*2*Math.PI
+		this.frequency=1+Math.random()
+		this.next=function(){
+			this.phase+=this.frequency*passTime
+			if(this.phase>=2*Math.PI){
+				this.phase-=2*Math.PI
+			}
+		}
+	}
+	var cellList=[]
+	for(var i=0;i<vetical*horizontal;i++){
+		cellList.push(new Cell())
+	}
+	var draw=function(){
+		canvas.clearRect(0,0,c.width,c.height)
+		var horizonalCellNum=Math.ceil(c.width/2/cellSize)
+		var verticalCellNum=Math.ceil(c.height/2/cellSize)
+		for(var i=0;i<vetical*horizontal;i++){
+			cellList[i].next()
+			var x=i%horizontal
+			var y=(i-x)/horizontal
+			if(x<=(horizontal-1)/2+horizonalCellNum&&x>=(horizontal-1)/2-horizonalCellNum&&y<=(vetical-1)/2+verticalCellNum&&y>=(vetical-1)/2-verticalCellNum){
+				var lightness=(Math.sin(cellList[i].phase)+1)*((maxLightness-minLightness)/2)+minLightness
+				canvas.fillStyle="hsla("+hue+","+saturation+"%,"+lightness+"%,1)"
+				var positionX=c.width/2+(x-horizontal/2)*cellSize
+				var positionY=c.height/2+(y-vetical/2)*cellSize
+				canvas.fillRect(positionX,positionY,cellSize+1,cellSize+1)
+			}
+		}
+	}
+	var needUpdate=false
+	var framecount=0
+	var animation=function(){
+		if(checkCanvasSize()||needUpdate||framecount%frames==0){
+			checkTime()
+			draw()
+			needUpdate=false
+		}
+		framecount++
+		requestAnimationFrame(animation)
+	}
+	gui.add(this,"cellSize",16,64).onChange(function(){needUpdate=true})
+	var colorFolder=gui.addFolder("color")
+	colorFolder.add(this,"hue",0,360).onChange(function(){needUpdate=true})
+	colorFolder.add(this,"saturation",0,100).onChange(function(){needUpdate=true})
+	colorFolder.add(this,"minLightness",0,100).onChange(function(){needUpdate=true})
+	colorFolder.add(this,"maxLightness",0,100).onChange(function(){needUpdate=true})
+	animation()
+	//]]>
+</script>
+</html>
