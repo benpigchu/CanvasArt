@@ -18,6 +18,7 @@
 	var c=document.getElementById("canvas")
 	var canvas=c.getContext("2d")
 	var cellSize=16
+	var speed=1
 	var hue=30
 	var saturation=100
 	var minLightness=50
@@ -37,19 +38,24 @@
 		passTime=(Date.now()-lastTime)/800
 		lastTime=Date.now()
 	}
+	var needUpdate=false
 	var Cell=function(){
 		this.phase=Math.random()*2*Math.PI
 		this.frequency=1+Math.random()
 		this.next=function(){
-			this.phase+=this.frequency*passTime
+			this.phase+=this.frequency*passTime*speed
 			if(this.phase>=2*Math.PI){
 				this.phase-=2*Math.PI
 			}
 		}
 	}
 	var cellList=[]
-	for(var i=0;i<vetical*horizontal;i++){
-		cellList.push(new Cell())
+	var reroll=function(){
+		needUpdate=true
+		cellList=[]
+		for(var i=0;i<vetical*horizontal;i++){
+			cellList.push(new Cell())
+		}
 	}
 	var draw=function(){
 		canvas.clearRect(0,0,c.width,c.height)
@@ -68,7 +74,6 @@
 			}
 		}
 	}
-	var needUpdate=false
 	var framecount=0
 	var animation=function(){
 		if(checkCanvasSize()||needUpdate||framecount%frames==0){
@@ -80,11 +85,14 @@
 		requestAnimationFrame(animation)
 	}
 	gui.add(this,"cellSize",16,64).onChange(function(){needUpdate=true})
+	gui.add(this,"speed",0,5,0.01).onChange(function(){needUpdate=true})
 	var colorFolder=gui.addFolder("color")
 	colorFolder.add(this,"hue",0,360).onChange(function(){needUpdate=true})
 	colorFolder.add(this,"saturation",0,100).onChange(function(){needUpdate=true})
 	colorFolder.add(this,"minLightness",0,100).onChange(function(){needUpdate=true})
 	colorFolder.add(this,"maxLightness",0,100).onChange(function(){needUpdate=true})
+	gui.add(this,"reroll").onChange(function(){needUpdate=true})
+	reroll()
 	animation()
 	//]]>
 </script>
