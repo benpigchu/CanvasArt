@@ -1,5 +1,13 @@
-*{margin:0;padding:0;box-sizing:border-box}
+*{margin:0;padding:0;box-sizing:border-box;position:relative;font-weight:normal}
 body,html{height:100%;width:100%;background:#efefef;font-family:"DengXian","PingFang","Arial",sans-serif;font-size:16px;color:rgba(0,0,0,0.8)}
+a::before{content:"";position:absolute;top:0;bottom:0;left:0;right:0;opacity:0;background-color:rgba(127,127,127,0.5)}
+a:hover::before{opacity:1}
+a{text-decoration:none;color:rgba(0,0,0,0.8)}
+
+*,*::before,*::after{transition-property:opacity,color,top,bottom,left,right,border,background,width,height,margin,padding;transition-duration:250ms}
+
+.button::before{content:"";z-index:5;position:absolute;top:0;bottom:0;left:0;right:0;opacity:0;background-color:rgba(127,127,127,0.5)}
+.button:hover::before{opacity:1}
 
 .card{box-shadow:0 10px 20px rgba(0,0,0,0.19),0 6px 6px rgba(0,0,0,0.23)}
 .left{position:fixed;left:0;top:0;bottom:0;width:448px;background:#bfbfbf}
@@ -10,7 +18,9 @@ body,html{height:100%;width:100%;background:#efefef;font-family:"DengXian","Ping
 
 .title{width:100%;height:80px;padding:8px;font-size:32px;border-bottom-color:rgba(31,31,31,0.5);border-bottom-width:1px;border-bottom-style:solid}
 
+.content{padding:8px;padding-left:12px}
 .content *{margin:8px;line-height:135%}
+.content h1,.content h2{border-bottom-color:rgba(31,31,31,0.5);border-bottom-width:1px;border-bottom-style:solid}
 .content h1{padding:8px 0;margin:8px 8px 16px}
 .content h2{padding:8px 0}
 .content h3{padding-top:8px}
