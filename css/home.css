@@ -10,15 +10,24 @@ a{text-decoration:none;color:rgba(0,0,0,0.8)}
 .button:hover::before{opacity:1}
 
 .card{box-shadow:0 10px 20px rgba(0,0,0,0.19),0 6px 6px rgba(0,0,0,0.23)}
-.left{position:fixed;left:0;top:0;bottom:0;width:448px;background:#bfbfbf}
-.nav{position:absolute;left:0;top:0;bottom:0;width:144px;background:#8f8f8f}
+.left{position:fixed;left:0;top:0;bottom:0;width:448px;background:#bfbfbf;z-index:2}
+.nav{position:absolute;left:0;top:0;bottom:0;width:144px;background:#8f8f8f;z-index:2}
 .content{position:absolute;left:144px;top:0;bottom:0;right:0}
 .canvas-wrap{position:fixed;left:448px;top:0;bottom:0;right:0}
 .canvas{position:absolute;left:0;top:0;bottom:0;right:0}
 
-.title{width:100%;height:80px;padding:8px;font-size:32px;border-bottom-color:rgba(31,31,31,0.5);border-bottom-width:1px;border-bottom-style:solid}
+.content-overlay{position:absolute;left:144px;top:0;bottom:0;right:0;background:#bfbfbf;pointer-events:none;z-index:1;opacity:0}
+.iframe-overlay{position:absolute;left:0;top:0;bottom:0;right:0;background:#efefef;pointer-events:none;z-index:1;opacity:0}
+.loading .iframe-overlay,.loading .content-overlay{opacity:1}
 
-.content{padding:8px;padding-left:12px}
+.title{width:100%;height:80px;top:0;padding:8px;font-size:32px;border-bottom-color:rgba(31,31,31,0.5);border-bottom-width:1px;border-bottom-style:solid}
+.list{width:100%;position:absolute;top:80px;bottom:0;overflow-x:hidden;overflow-y:overlay}
+.item{width:100%;height:32px;padding:8px;display:block;overflow:hidden}
+.item.current::before{opacity:0.5}
+.item.current:hover::before{opacity:1}
+.item.current{color:rgba(0,0,0,1)}
+
+.content{padding:8px;padding-left:12px;overflow-x:hidden;overflow-y:overlay}
 .content *{margin:8px;line-height:135%}
 .content h1,.content h2{border-bottom-color:rgba(31,31,31,0.5);border-bottom-width:1px;border-bottom-style:solid}
 .content h1{padding:8px 0;margin:8px 8px 16px}

@@ -5,14 +5,15 @@
 	<title>Canvas Art</title>
 	<link rel="stylesheet" href="css/home.css">
 </head>
-<body>
+<body class="loading">
 	<div class="left card">
 		<nav class="nav card">
 			<a href="#">
-				<div class="title button">Canvas<br>Art</div>
+				<div class="title button" id="title">Canvas<br>Art</div>
 			</a>
 			<div class="list" id="list"></div>
 		</nav>
+		<div class="content-overlay" id="content-overlay"></div>
 		<div class="content" id="content">
 			<h1>Canvas Art</h1>
 			<p>Experiments based on html &lt;canvas>.</p>
@@ -22,7 +23,9 @@
 		</div>
 	</div>
 	<div class="canvas-wrap">
+		<div class="iframe-overlay" id="iframe-overlay"></div>
 		<iframe src="" frameborder="0" class="canvas" id="canvas" height="100%" width="100%"></iframe>
 	</div>
 </body>
+<script src="index.js"></script>
 </html>

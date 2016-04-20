@@ -38,7 +38,7 @@
 		passTime=(Date.now()-lastTime)/800
 		lastTime=Date.now()
 	}
-	var needUpdate=false
+	var needUpdate=true
 	var Cell=function(){
 		this.phase=Math.random()*2*Math.PI
 		this.frequency=1+Math.random()
@@ -76,6 +76,9 @@
 	}
 	var framecount=0
 	var animation=function(){
+		if(needUpdate){
+			document.body.style.background="hsla("+hue+","+saturation+"%,"+(maxLightness+minLightness)/2+"%,1)"
+		}
 		if(checkCanvasSize()||needUpdate||framecount%frames==0){
 			checkTime()
 			draw()
@@ -84,7 +87,7 @@
 		framecount++
 		requestAnimationFrame(animation)
 	}
-	gui.add(this,"cellSize",16,64).onChange(function(){needUpdate=true})
+	gui.add(this,"cellSize",8,64).onChange(function(){needUpdate=true})
 	gui.add(this,"speed",0,5,0.01).onChange(function(){needUpdate=true})
 	var colorFolder=gui.addFolder("color")
 	colorFolder.add(this,"hue",0,360).onChange(function(){needUpdate=true})
