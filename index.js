@@ -85,7 +85,6 @@ var show=function(data){
 		}
 	}
 	goToBoard(hash)
-	document.body.classList.remove("loading")
 }
 
 var http=new XMLHttpRequest()
