@@ -36,7 +36,6 @@ var fillData=function(name,callback){
 }
 
 var goToBoard=function(name){
-	document.body.classList.remove("loading")
 	if(current!=""){
 		document.getElementById("item-"+current).classList.remove("current")
 	}
