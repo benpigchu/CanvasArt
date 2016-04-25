@@ -41,7 +41,7 @@
 	var starList=[]
 	var reroll=function(){
 		needUpdate=true
-		starNumber=starList.length
+		starNumber=parseInt(starNumberfix)
 		starList=new Array(starNumber).fill("").map(function(){return new Star()})
 	}
 	var centerX=20
