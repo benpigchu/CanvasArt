@@ -2,7 +2,7 @@
 <html>
 <head>
 	<meta charset="UTF-8">
-	<title>logov18</title>
+	<title>star trail</title>
 	<link rel="stylesheet" href="../../css/canvas.css">
 </head>
 <body>
@@ -41,6 +41,7 @@
 	var starList=[]
 	var reroll=function(){
 		needUpdate=true
+		starNumber=starList.length
 		starList=new Array(starNumber).fill("").map(function(){return new Star()})
 	}
 	var centerX=20
