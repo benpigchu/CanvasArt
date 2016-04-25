@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>logov18</title>
+	<link rel="stylesheet" href="../../css/canvas.css">
+</head>
+<body>
+	<canvas id="canvas"></canvas>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5.1/dat.gui.min.js"></script>
+<script>
+	//<![CDATA[
+	var gui=new dat.GUI()
+	var frames=1
+	var c=document.getElementById("canvas")
+	var canvas=c.getContext("2d")
+	var radius=Math.sqrt(c.width*c.width+c.height*c.height)
+	var checkCanvasSize=function(){
+		if(c.width!=window.innerWidth||c.height!=window.innerHeight)
+		{
+			c.width=window.innerWidth
+			c.height=window.innerHeight
+			radius=Math.sqrt(c.width*c.width+c.height*c.height)
+			return true
+		}
+		return false
+	}
+	var passTime=0
+	var lastTime=Date.now()
+	var checkTime=function(){
+		passTime=(Date.now()-lastTime)/800
+		lastTime=Date.now()
+	}
+	var needUpdate=true
+	var starNumber=500
+	function Star(){
+		this.theta=2*Math.PI*Math.random()
+		this.radius=Math.random()
+	}
+	var starList=[]
+	var reroll=function(){
+		needUpdate=true
+		starList=new Array(starNumber).fill("").map(function(){return new Star()})
+	}
+	var centerX=20
+	var centerY=20
+	var speed=50
+	var speedOffset=20
+	var background="#000000"
+	var star="#FF7F00"
+	var starSize=3
+	var alpha=0.1
+	var draw=function(){
+		var eps=0.001
+		var getColor=function(str,alpha){
+			return "rgba("+parseInt(str[1]+str[2],16)+","+parseInt(str[3]+str[4],16)+","+parseInt(str[5]+str[6],16)+","+alpha+")"
+		}
+		canvas.lineCap="round"
+		canvas.lineJoin="round"
+		canvas.lineWidth=starSize
+		canvas.fillStyle=getColor(background,alpha)
+		canvas.strokeStyle=star
+		canvas.fillRect(0,0,c.width,c.height)
+		starList.forEach(function(star){
+			var r=star.radius*radius
+			var deltaTheta=passTime*speed/100+(star.radius-0.5)*speedOffset/1000
+			var newTheta=star.theta+deltaTheta
+			newTheta-=newTheta>(2*Math.PI)?2*Math.PI:0
+			newTheta+=newTheta<0?2*Math.PI:0
+			var drawTheta=newTheta
+			if(Math.abs(deltaTheta)<eps){drawTheta=star.theta+eps*(deltaTheta<0?-1:1)}
+			canvas.beginPath()
+			canvas.arc(c.width*centerX/100,c.height*centerY/100,r,star.theta,drawTheta,deltaTheta<0)
+			canvas.stroke()
+			canvas.closePath()
+			star.theta=newTheta
+		})
+	}
+	var framecount=0
+	var animation=function(){
+		if(needUpdate){
+			document.body.style.background=background
+		}
+		if(checkCanvasSize()||needUpdate||framecount%frames==0){
+			checkTime()
+			draw()
+			needUpdate=false
+		}
+		framecount++
+		framecount%=frames
+		requestAnimationFrame(animation)
+	}
+	gui.add(this,"starNumber",0,1000).onChange(function(value){
+		needUpdate=true
+		if(value<=starList.length){
+			starList=starList.slice(0,value)
+		}else{
+			starList=starList.concat(new Array(parseInt(value)-starList.length).fill("").map(function(){return new Star()}))
+		}
+	})
+	gui.add(this,"speed",-100,100).onChange(function(){needUpdate=true})
+	gui.add(this,"speedOffset",-25,25).onChange(function(){needUpdate=true})
+	gui.add(this,"centerX",0,100).onChange(function(){needUpdate=true})
+	gui.add(this,"centerY",0,100).onChange(function(){needUpdate=true})
+	gui.add(this,"alpha",0,1).onChange(function(){needUpdate=true})
+	gui.add(this,"starSize",0,10).onChange(function(){needUpdate=true})
+	gui.addColor(this,"background").onChange(function(){needUpdate=true})
+	gui.addColor(this,"star").onChange(function(){needUpdate=true})
+	gui.add(this,"reroll")
+	reroll()
+	animation()
+	//]]>
+</script>
+</html>
