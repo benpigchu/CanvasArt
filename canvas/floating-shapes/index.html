@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>floating shapes</title>
+	<link rel="stylesheet" href="../../css/canvas.css">
+</head>
+<body>
+</body>
+<style>
+	.dg.ac{
+		z-index:1
+	}
+	.dg.main.a{
+		width:300px !important
+	}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5.1/dat.gui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/two.js/0.6.0/two.min.js"></script>
+<script>
+	//<![CDATA[
+	var gui=new dat.GUI()
+	var two=new Two({type:Two.Types.canvas,fullscreen:true})
+	two.appendTo(document.body)
+	var background=two.makeGroup()
+	var maxShapes=200
+	var generateProcess=0
+	var generateInterval=1
+	var size=5
+	var sizeDiversity=2
+	var positionDiversity=30
+	var offsetSpeed=80
+	var offsetSpeedDiversity=40
+	var rotate=0
+	var rotateDiversity=100
+	var rotateSpeed=0
+	var rotateSpeedDiversity=50
+	var disappearTime=1000
+	var disappearTimeDiversity=200
+	var swingWidth=5
+	var swingWidthDiversity=2.5
+	var swingPhase=0
+	var swingPhaseDiversity=90
+	var swingSpeed=0
+	var swingSpeedDiversity=5
+	var side=5
+	var sideDiversity=2
+	var backgroundColor="#000000"
+	var floaterColor1="#ffff00"
+	var floaterColor2="#ff7f00"
+	var floaterColor3="#ff3f00"
+	var floaterColor4="#ff0000"
+	var backgroundBoard=two.makeRectangle(0,0,10,10)
+	backgroundBoard.noStroke()
+	backgroundBoard.fill=backgroundColor
+	background.add(backgroundBoard)
+	var group=two.makeGroup()
+	var random=function(center,diversity){
+		var small=center-diversity
+		var big=center+diversity
+		small=small<0?0:small
+		return small+Math.random()*(big-small)
+	}
+	var Floater=function(){
+		this.sizeRatio=random(size,sizeDiversity)
+		this.position=positionDiversity*(2*Math.random()-1)
+		this.scale=100
+		this.offset=0
+		this.offsetSpeedRatio=random(offsetSpeed,offsetSpeedDiversity)
+		this.rotate=rotate+rotateDiversity*(2*Math.random()-1)
+		this.rotateSpeed=rotateSpeed+rotateSpeedDiversity*(2*Math.random()-1)
+		this.swingWidth=random(swingWidth,swingWidthDiversity)
+		this.swingPhase=swingPhase+swingPhaseDiversity*(2*Math.random()-1)
+		this.swingSpeed=swingSpeed+swingSpeedDiversity*(2*Math.random()-1)
+		this.life=random(disappearTime,disappearTimeDiversity)
+		this.remainLife=this.life
+		this.polygon=two.makePolygon(0,0,1,parseInt(random(side+0.5,sideDiversity)))
+		this.polygon.noStroke()
+		this.polygon.fill=window["floaterColor"+parseInt(Math.random()*4+1)]
+		group.add(this.polygon)
+	}
+	Floater.prototype.update=function(){
+		this.offset+=this.offsetSpeedRatio*two.timeDelta/1000
+		this.remainLife-=two.timeDelta
+		this.scale=100*this.remainLife/this.life
+		this.rotate+=this.rotateSpeed
+		while(this.rotate<0){this.rotate+=3600}
+		while(this.rotate>=3600){this.rotate-=3600}
+		this.swingPhase+=this.swingSpeed
+		while(this.swingPhase<0){this.swingPhase+=360}
+		while(this.swingPhase>=360){this.swingPhase-=360}
+		this.polygon.rotation=Math.PI*2*this.rotate/3600
+		this.polygon.scale=(this.scale*this.sizeRatio)/100*two.width/100
+		this.polygon.translation.set((this.position+this.swingWidth*Math.sin(this.swingPhase/180*Math.PI))*two.width/100,this.sizeRatio*two.width/100-this.offset*two.height/100)
+	}
+	var floaterList=[]
+	group.translation.set(two.width/2,two.height)
+	backgroundBoard.scale=two.width>two.height?two.width:two.height
+	var draw=function(){
+		backgroundBoard.fill=backgroundColor
+		if(!two.timeDelta){two.timeDelta=0}
+		generateProcess+=Math.random()*2*two.timeDelta/10
+		for(var i=0;i<floaterList.length;i++){
+			floaterList[i].update()
+			if(floaterList[i].remainLife<0){
+				floaterList[i].polygon.remove()
+				floaterList.splice(i,1)
+			}
+		}
+		if(generateProcess>generateInterval){
+			while(generateProcess>generateInterval){
+				generateProcess-=generateInterval
+			}
+			if(floaterList.length<maxShapes){
+				floaterList.push(new Floater())
+			}
+		}
+		backgroundBoard.scale=two.width>two.height?two.width:two.height
+		group.translation.set(two.width/2,two.height)
+	}.bind(this)
+	var floaterFolder=gui.addFolder("floater")
+	floaterFolder.add(this,"maxShapes",0,500).step(1)
+	floaterFolder.add(this,"generateInterval",0.1,20).step(0.1)
+	floaterFolder.add(this,"side",3,10).step(1)
+	floaterFolder.add(this,"sideDiversity",0,7).step(1)
+	floaterFolder.add(this,"size",0,20).step(0.1)
+	floaterFolder.add(this,"sizeDiversity",0,5).step(0.1)
+	floaterFolder.add(this,"rotate",-1800,1800)
+	floaterFolder.add(this,"rotateDiversity",0,1800)
+	floaterFolder.addColor(this,"floaterColor1")
+	floaterFolder.addColor(this,"floaterColor2")
+	floaterFolder.addColor(this,"floaterColor3")
+	floaterFolder.addColor(this,"floaterColor4")
+	var positionFolder=gui.addFolder("position")
+	positionFolder.add(this,"positionDiversity",0,50)
+	var motionFolder=gui.addFolder("motion")
+	motionFolder.add(this,"offsetSpeed",0,160)
+	motionFolder.add(this,"offsetSpeedDiversity",0,160)
+	motionFolder.add(this,"rotateSpeed",-360,360)
+	motionFolder.add(this,"rotateSpeedDiversity",0,360)
+	motionFolder.add(this,"swingWidth",0,10)
+	motionFolder.add(this,"swingWidthDiversity",0,10)
+	motionFolder.add(this,"swingPhase",-180,180)
+	motionFolder.add(this,"swingPhaseDiversity",0,180)
+	motionFolder.add(this,"swingSpeed",-18,18)
+	motionFolder.add(this,"swingSpeedDiversity",0,18)
+	motionFolder.add(this,"disappearTime",0,10000)
+	motionFolder.add(this,"disappearTimeDiversity",0,10000)
+	var backgroundFolder=gui.addFolder("background")
+	backgroundFolder.addColor(this,"backgroundColor")
+	two.bind("update",draw).play()
+	//]]>
+</script>
+</html>
