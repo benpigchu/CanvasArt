@@ -71,8 +71,8 @@
 	var fragmentShader=makeShader(document.getElementById("2d-fragment-shader"))
 	var makeProgram=function(vertex,fragment){
 		var program=gl.createProgram()
-		gl.attachShader(program,vertexShader)
-		gl.attachShader(program,fragmentShader)
+		gl.attachShader(program,vertex)
+		gl.attachShader(program,fragment)
 		gl.linkProgram(program)
 		if(gl.getProgramParameter(program,gl.LINK_STATUS)){
 			return program
@@ -105,7 +105,6 @@
 		gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([xmin,ymax,xmin,ymin,xmax,ymax,xmax,ymax,xmin,ymin,xmax,ymin]),gl.STATIC_DRAW)
 		gl.vertexAttribPointer(texCoordAttributeLocation,2,gl.FLOAT,false,0,0)
 	}
-	setupTexCoords(0,0.5,0.25,0.75)
 	var darkColor=[14,43,13]
 	var lightColor=[139,175,13]
 	var setupColor=function(){
@@ -158,8 +157,7 @@
 		},function(){console.warn("No video input")})
 	})
 	var checkCanvasSize=function(){
-		if(c.width!==window.innerWidth||c.height!==window.innerHeight)
-		{
+		if(c.width!==window.innerWidth||c.height!==window.innerHeight){
 			c.width=window.innerWidth
 			c.height=window.innerHeight
 			gl.viewport(0,0,gl.canvas.width,gl.canvas.height)
