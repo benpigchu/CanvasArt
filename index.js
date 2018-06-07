@@ -1,10 +1,5 @@
 var current=""
 
-var isTransition=false
-document.body.addEventListener("transitionend",function(){
-	isTransition=false
-})
-
 var homeText=document.getElementById("content").innerHTML
 
 var loadIframe=function(name,callback){
@@ -41,29 +36,14 @@ var goToBoard=function(name){
 	}
 	document.body.classList.add("loading")
 	isTransition=true
-	if(isTransition){
-		var delayedLoad=function(){
-			fillData(name,function(){
-				isTransition=true
-				document.body.classList.remove("loading")
-				if(name!=""){
-					document.getElementById("item-"+name).classList.add("current")
-				}
-				current=name
-			})
-			document.getElementById("content-overlay").removeEventListener("transitionend",delayedLoad)
-		}.bind(this)
-		document.getElementById("content-overlay").addEventListener("transitionend",delayedLoad)
-	}else{
-		fillData(path,function(){
-			isTransition=true
-			document.body.classList.remove("loading")
-			if(name!=""){
-				document.getElementById("item-"+name).classList.add("current")
-			}
-			current=name
-		})
-	}
+	fillData(name,function(){
+		isTransition=true
+		document.body.classList.remove("loading")
+		if(name!=""){
+			document.getElementById("item-"+name).classList.add("current")
+		}
+		current=name
+	})
 }.bind(this)
 
 var jumpFunctionGenerator=function(name){
