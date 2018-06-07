@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>noise</title>
+	<link rel="stylesheet" href="../../css/canvas.css">
+</head>
+<body>
+	<canvas id="canvas"></canvas>
+</body>
+<script id="2d-vertex-shader" type="x-shader/x-vertex-shader">
+	attribute vec2 a_position;
+	varying vec2 v_position;
+	void main(){
+		v_position=a_position;
+		gl_Position=vec4(a_position,0,1);
+	}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.4/dat.gui.min.js"></script>
+<script id="2d-fragment-shader" type="x-shader/x-fragment-shader">
+	precision mediump float;
+	varying vec2 v_position;
+	uniform vec3 u_darkColor;
+	uniform vec3 u_lightColor;
+	uniform vec2 u_resolution;
+	uniform float u_seed;
+	uniform float u_angle;
+	uniform float u_width;
+	uniform float u_length;
+	float random2d(vec2 st){//from thebookofshaders.com, modified
+		return fract(sin(dot(st.xy,vec2(12.9898,78.233)))*43758.5453123);
+	}
+	void main(){
+		vec2 coord=gl_FragCoord.xy-u_resolution/2.0;
+		float sang=sin(u_angle);
+		float cang=cos(u_angle);
+		vec2 pos=vec2(coord.x*cang-coord.y*sang,coord.x*sang+coord.y*cang);
+		float xPos=floor(pos.x/u_width);
+		float yPos=floor(pos.y/u_length);
+		float yFrac=fract(pos.y/u_length);
+		vec2 ran=vec2(xPos+u_seed,yPos);
+		float up2Ran=random2d(ran-vec2(0.0,2.0))-2.0;
+		float up1Ran=random2d(ran-vec2(0.0,1.0))-1.0;
+		float baseRan=random2d(ran);
+		float down1Ran=random2d(ran+vec2(0.0,1.0))+1.0;
+		float down2Ran=random2d(ran+vec2(0.0,2.0))+2.0;
+		float uperSeg=(up2Ran+up1Ran)/2.0;
+		float upSeg=(up1Ran+baseRan)/2.0;
+		float downSeg=(baseRan+down1Ran)/2.0;
+		float downerSeg=(down1Ran+down2Ran)/2.0;
+		vec2 seg=yFrac<upSeg?vec2(uperSeg,upSeg):yFrac>downSeg?vec2(downSeg,downerSeg):vec2(upSeg,downSeg);
+		float up=yFrac-seg.x;
+		float down=seg.y-yFrac;
+		vec2 offset=yFrac<upSeg?vec2(-1.0,-1.0):yFrac>downSeg?vec2(1.0,1.0):vec2(0.0,0.0);
+		vec3 color=//vec3((seg-offset+0.5)/2.0,0);
+		(u_lightColor*down+u_darkColor*up)/(down+up)/255.0;
+		gl_FragColor=vec4(color,1);
+	}
+</script>
+<script>
+	//<![CDATA[
+	var gui=new dat.GUI()
+	var needUpdate=true
+	var c=document.getElementById("canvas")
+	var gl=c.getContext("webgl")
+	var makeShader=function(element){
+		var text=element.text
+		var typename=element.type
+		var type
+		if(typename==="x-shader/x-vertex-shader"){
+			type=gl.VERTEX_SHADER
+		}else if(typename==="x-shader/x-fragment-shader"){
+			type=gl.FRAGMENT_SHADER
+		}else{
+			return
+		}
+		var shader=gl.createShader(type)
+		gl.shaderSource(shader,text)
+		gl.compileShader(shader)
+		if(gl.getShaderParameter(shader,gl.COMPILE_STATUS)){
+			return shader
+		}else{
+			gl.deleteShader(shader)
+			throw new Error("shader init failed")
+		}
+	}
+	var vertexShader=makeShader(document.getElementById("2d-vertex-shader"))
+	var fragmentShader=makeShader(document.getElementById("2d-fragment-shader"))
+	var makeProgram=function(vertex,fragment){
+		var program=gl.createProgram()
+		gl.attachShader(program,vertex)
+		gl.attachShader(program,fragment)
+		gl.linkProgram(program)
+		if(gl.getProgramParameter(program,gl.LINK_STATUS)){
+			return program
+		}else{
+			gl.deleteProgram(program)
+			throw new Error("program init failed")
+		}
+	}
+	var program=makeProgram(vertexShader,fragmentShader)
+	var positionAttributeLocation=gl.getAttribLocation(program,"a_position")
+	var resolutionUniformLocation=gl.getUniformLocation(program,"u_resolution")
+	var darkColorUniformLocation=gl.getUniformLocation(program,"u_darkColor")
+	var lightColorUniformLocation=gl.getUniformLocation(program,"u_lightColor")
+	var angleUniformLocation=gl.getUniformLocation(program,"u_angle")
+	var seedUniformLocation=gl.getUniformLocation(program,"u_seed")
+	var widthUniformLocation=gl.getUniformLocation(program,"u_width")
+	var lengthUniformLocation=gl.getUniformLocation(program,"u_length")
+	var positionBuffer=gl.createBuffer()
+	var positions=[-1,-1,-1,1,1,-1,1,-1,-1,1,1,1]
+	var setupPositions=function(){
+		gl.useProgram(program)
+		gl.enableVertexAttribArray(positionAttributeLocation)
+		gl.bindBuffer(gl.ARRAY_BUFFER,positionBuffer)
+		gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(positions),gl.STATIC_DRAW)
+		gl.vertexAttribPointer(positionAttributeLocation,2,gl.FLOAT,false,0,0)
+	}
+	setupPositions()
+	var darkColor=[0,0,0]
+	var lightColor=[255,127,0]
+	var angle=45
+	var width=8
+	var length=160
+	var setupParam=function(){
+		gl.uniform3fv(darkColorUniformLocation,darkColor)
+		gl.uniform3fv(lightColorUniformLocation,lightColor)
+		gl.uniform1f(angleUniformLocation,angle/180*Math.PI)
+		gl.uniform1f(widthUniformLocation,width)
+		gl.uniform1f(lengthUniformLocation,length)
+		needUpdate=true
+	}
+	var refresh=function(){
+		gl.uniform1f(seedUniformLocation,Math.random())
+		needUpdate=true
+	}
+	setupParam()
+	refresh()
+	var checkCanvasSize=function(){
+		if(c.width!==window.innerWidth||c.height!==window.innerHeight){
+			c.width=window.innerWidth
+			c.height=window.innerHeight
+			gl.viewport(0,0,gl.canvas.width,gl.canvas.height)
+			return true
+		}
+		return false
+	}
+	var autoRefresh=true
+	var refreshFreq=15
+	var counter=refreshFreq
+	var refreshCount=function(){
+		counter-=Math.random()
+		if(counter<0){
+			counter+=refreshFreq
+			refresh()
+		}
+	}
+	var draw=function(){
+		gl.clearColor(0,0,0,0)
+		gl.clear(gl.COLOR_BUFFER_BIT)
+		gl.useProgram(program)
+		gl.uniform2f(resolutionUniformLocation,gl.canvas.width,gl.canvas.height)
+		gl.drawArrays(gl.TRIANGLES,0,6)
+	}
+	var animation=function(){
+		if(autoRefresh){
+			refreshCount()
+		}
+		if(checkCanvasSize()||needUpdate){
+			draw()
+			needUpdate=false
+		}
+		requestAnimationFrame(animation)
+	}
+	animation()
+	gui.addColor(this,"lightColor").onChange(function(){setupParam()})
+	gui.addColor(this,"darkColor").onChange(function(){setupParam()})
+	gui.add(this,"angle",-180,180).onChange(function(){setupParam()})
+	gui.add(this,"width",4,16).onChange(function(){setupParam()})
+	gui.add(this,"length",80,320).onChange(function(){setupParam()})
+	gui.add(this,"refreshFreq",5,60)
+	gui.add(this,"autoRefresh")
+	gui.add(this,"refresh")
+	//]]>
+</script>
+</html>
