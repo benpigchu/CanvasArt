@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>logov20</title>
+</head>
+<style>
+	html{background:#000;background-origin:50%,50%;background-position:50%,50%}
+	body,html,#background,#canvas{height:100%;width:100%}
+	*{margin:0;padding:0}
+	#background{position:fixed;overflow:none}
+	#canvas{position:absolute}
+</style>
+<body>
+	<div id="background">
+		<canvas id="canvas"></canvas>
+	</div>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+<script>
+	//<![CDATA[
+	var gui=new dat.GUI()
+	var needUpdate=true
+	var nullFilledArray=function(length){
+		let array=new Array(length)
+		for(var i=0;i<length;i++){
+			array[i]=null
+		}
+		return array
+	}
+	var makeShader=function(gl,text,typename){
+		var type
+		if(typename==="vertex"){
+			type=gl.VERTEX_SHADER
+		}else if(typename==="fragment"){
+			type=gl.FRAGMENT_SHADER
+		}else{
+			return
+		}
+		var shader=gl.createShader(type)
+		gl.shaderSource(shader,text)
+		gl.compileShader(shader)
+		if(gl.getShaderParameter(shader,gl.COMPILE_STATUS)){
+			return shader
+		}else{
+			console.log(text)
+			gl.deleteShader(shader)
+			throw new Error("shader init failed")
+		}
+	}
+	var makeProgram=function(gl,vertex,fragment){
+		var program=gl.createProgram()
+		gl.attachShader(program,vertex)
+		gl.attachShader(program,fragment)
+		gl.linkProgram(program)
+		if(gl.getProgramParameter(program,gl.LINK_STATUS)){
+			return program
+		}else{
+			gl.deleteProgram(program)
+			throw new Error("program init failed")
+		}
+	}
+	var setupTexture=function(gl,texture,image,id){
+		gl.activeTexture(gl["TEXTURE"+id])
+		gl.bindTexture(gl.TEXTURE_2D,texture)
+		gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST)
+		gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST)
+		gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image)
+	}
+	var charCountX=16
+	var charCountY=16
+	var charWidth=40
+	var charHeight=40
+	var canvasCountX=48
+	var canvasCountY=27
+	var positions=new Float32Array([-1,-1,-1,1,1,-1,1,-1,-1,1,1,1])
+	var image=new Image()
+	image.src="texture.svg"
+	var canvas=document.getElementById("canvas")
+	var gl=canvas.getContext("webgl",{preserveDrawingBuffer:true})
+	var pass1Vertex=""+
+	"uniform vec2 u_resolution;"+
+	"uniform vec2 u_texResolution;"+
+	"uniform vec2 u_size;"+
+	"attribute vec2 a_texCenter;"+
+	"attribute vec2 a_position;"+
+	"attribute vec2 a_center;"+
+	"varying vec2 v_texCoord;"+
+	"void main(){"+
+	"    v_texCoord=(a_position/2.0+a_texCenter+vec2(0.5,0.5))*u_size/u_texResolution;"+
+	"    gl_Position=vec4(((a_center*2.0+vec2(1,1)+a_position)*u_size/u_resolution-vec2(1,1))*vec2(1,-1),0,1);"+
+	"}"
+	var pass1Fragment=""+
+	"precision mediump float;"+
+	"uniform sampler2D u_image;"+
+	"uniform vec3 u_background;"+
+	"uniform vec3 u_foreground;"+
+	"varying vec2 v_texCoord;"+
+	"void main(){"+
+	"    float mask=texture2D(u_image,v_texCoord).a;"+
+	"    gl_FragColor=vec4(mask*u_foreground+(1.0-mask)*u_background,1);"+
+	"}"
+	var pass1program=makeProgram(gl,makeShader(gl,pass1Vertex,"vertex"),makeShader(gl,pass1Fragment,"fragment"))
+	gl.useProgram(pass1program)
+	var pass1ResolutionUniformLocation=gl.getUniformLocation(pass1program,"u_resolution")
+	gl.uniform2f(pass1ResolutionUniformLocation,charWidth*canvasCountX,charHeight*canvasCountY)
+	var pass1SizeUniformLocation=gl.getUniformLocation(pass1program,"u_size")
+	gl.uniform2f(pass1SizeUniformLocation,charWidth,charHeight)
+	var pass1TexResolutionUniformLocation=gl.getUniformLocation(pass1program,"u_texResolution")
+	gl.uniform2f(pass1TexResolutionUniformLocation,charWidth*charCountX,charHeight*charCountY)
+	var pass1ImageUniformLocation=gl.getUniformLocation(pass1program,"u_image")
+	gl.uniform1i(pass1ImageUniformLocation,0)
+	var pass1BackgroundColor=[0,0,0]
+	var pass1ForegroundColor=[255*0.75,255*0.375,0]
+	var pass1BackgroundLocation=gl.getUniformLocation(pass1program,"u_background")
+	var pass1ForegroundLocation=gl.getUniformLocation(pass1program,"u_foreground")
+	var pass1UpdateColors=function(){
+		gl.useProgram(pass1program)
+		gl.uniform3fv(pass1BackgroundLocation,pass1BackgroundColor.map(function(v){return v/255}))
+		gl.uniform3fv(pass1ForegroundLocation,pass1ForegroundColor.map(function(v){return v/255}))
+	}
+	pass1UpdateColors()
+	var pass1PositionAttributeLocation=gl.getAttribLocation(pass1program,"a_position")
+	var pass1CenterAttributeLocation=gl.getAttribLocation(pass1program,"a_center")
+	var pass1TexCenterAttributeLocation=gl.getAttribLocation(pass1program,"a_texCenter")
+	var pass1PositionBuffer=gl.createBuffer()
+	var pass1CenterBuffer=gl.createBuffer()
+	var pass1TexCenterBuffer=gl.createBuffer()
+	var pass1Texture=gl.createTexture()
+	var pass1FrameBuffer=gl.createFramebuffer()
+	var pass2texture=gl.createTexture()
+	gl.bindFramebuffer(gl.FRAMEBUFFER,pass1FrameBuffer)
+	gl.activeTexture(gl["TEXTURE"+1])
+	gl.bindTexture(gl.TEXTURE_2D,pass2texture)
+	gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE)
+	gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE)
+	gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST)
+	gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST)
+	gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,canvasCountX*charWidth,canvasCountY*charHeight,0,gl.RGBA,gl.UNSIGNED_BYTE,null)
+	gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,pass2texture,0)
+	var pass1DrawDatas=function(datas){
+		gl.bindFramebuffer(gl.FRAMEBUFFER,pass1FrameBuffer)
+		gl.viewport(0,0,canvasCountX*charWidth,canvasCountY*charHeight)
+		gl.useProgram(pass1program)
+		var positionData=new Float32Array(12*datas.length)
+		var centerData=new Float32Array(12*datas.length)
+		var texCenterData=new Float32Array(12*datas.length)
+		datas.forEach(function(value,index){
+			positionData.set(positions,index*12)
+			for(let i=0;i<6;i++){
+				centerData.set(value.pos,index*12+2*i)
+				texCenterData.set(value.char,index*12+2*i)
+			}
+		})
+		gl.enableVertexAttribArray(pass1PositionAttributeLocation)
+		gl.bindBuffer(gl.ARRAY_BUFFER,pass1PositionBuffer)
+		gl.bufferData(gl.ARRAY_BUFFER,positionData,gl.STATIC_DRAW)
+		gl.vertexAttribPointer(pass1PositionAttributeLocation,2,gl.FLOAT,false,0,0)
+		gl.enableVertexAttribArray(pass1CenterAttributeLocation)
+		gl.bindBuffer(gl.ARRAY_BUFFER,pass1CenterBuffer)
+		gl.bufferData(gl.ARRAY_BUFFER,centerData,gl.STATIC_DRAW)
+		gl.vertexAttribPointer(pass1CenterAttributeLocation,2,gl.FLOAT,false,0,0)
+		gl.enableVertexAttribArray(pass1TexCenterAttributeLocation)
+		gl.bindBuffer(gl.ARRAY_BUFFER,pass1TexCenterBuffer)
+		gl.bufferData(gl.ARRAY_BUFFER,texCenterData,gl.STATIC_DRAW)
+		gl.vertexAttribPointer(pass1TexCenterAttributeLocation,2,gl.FLOAT,false,0,0)
+		gl.drawArrays(gl.TRIANGLES,0,6*datas.length)
+	}
+	var pass1Inited=false
+	var pass1ChangeData=nullFilledArray(canvasCountY)
+	var pass1UpdateOffset=0
+	var pass1UpdateInterval=5
+	var pass1UpdateTime=0
+	var pass1Init=function(){
+		pass1ChangeData=pass1ChangeData.map(function(){
+			return Math.floor(Math.random()*canvasCountX)
+		})
+		pass1DrawDatas(nullFilledArray(canvasCountX*canvasCountY).map(function(value,index){
+			return{pos:[index%canvasCountX,Math.floor(index/canvasCountX)],char:[Math.floor(Math.random()*charCountX),Math.floor(Math.random()*charCountY)]}
+		}))
+	}
+	var pass1Updated=false
+	var pass1Update=function(){
+		pass1Updated=false
+		pass1UpdateTime++
+		if(pass1UpdateTime>=pass1UpdateInterval){
+			pass1Updated=true
+			pass1UpdateTime=0
+			pass1DrawDatas(pass1ChangeData.map(function(value,index){
+				return{pos:[(value+pass1UpdateOffset)%canvasCountX,index],char:[Math.floor(Math.random()*charCountX),Math.floor(Math.random()*charCountY)]}
+			}))
+			pass1UpdateOffset++
+			pass1UpdateOffset%=canvasCountX
+		}
+	}
+	var pass2Vertex=""+
+	"attribute vec2 a_position;"+
+	"void main(){"+
+	"    gl_Position=vec4(a_position,0,1);"+
+	"}"
+	var pass2Fragment=""+
+	"precision mediump float;"+
+	"uniform sampler2D u_image;"+
+	"uniform vec2 u_resolution;"+
+	"uniform vec2 u_texResolution;"+
+	"uniform float u_zoom;"+
+	"void main(){"+
+	"    vec2 pos=(gl_FragCoord.xy-(u_resolution)/2.0)/u_texResolution/u_zoom+vec2(0.5,0.5);"+
+	"    gl_FragColor=texture2D(u_image,vec2(mod(pos.x,1.0),mod(pos.y,1.0)));"+
+	"}"
+	var pass2program=makeProgram(gl,makeShader(gl,pass2Vertex,"vertex"),makeShader(gl,pass2Fragment,"fragment"))
+	gl.useProgram(pass2program)
+	var pass2ResolutionUniformLocation=gl.getUniformLocation(pass2program,"u_resolution")
+	var pass2TexResolutionUniformLocation=gl.getUniformLocation(pass2program,"u_texResolution")
+	gl.uniform2f(pass2TexResolutionUniformLocation,charWidth*canvasCountX,charHeight*canvasCountY)
+	var pass2Zoom=1
+	var pass2ZoomUniformLocation=gl.getUniformLocation(pass2program,"u_zoom")
+	var pass2UpdateZoom=function(){
+		gl.useProgram(pass2program)
+		gl.uniform1f(pass2ZoomUniformLocation,pass2Zoom)
+	}
+	pass2UpdateZoom()
+	var pass2ImageUniformLocation=gl.getUniformLocation(pass2program,"u_image")
+	gl.uniform1i(pass2ImageUniformLocation,1)
+	var pass2PositionAttributeLocation=gl.getAttribLocation(pass2program,"a_position")
+	var pass2PositionBuffer=gl.createBuffer()
+	var checkCanvasSize=function(){
+		if(canvas.width!==window.innerWidth||canvas.height!==window.innerHeight){
+			canvas.width=window.innerWidth
+			canvas.height=window.innerHeight
+			return true
+		}
+		return false
+	}
+	var pass2Paint=function(){
+		gl.bindFramebuffer(gl.FRAMEBUFFER,null)
+		gl.viewport(0,0,gl.canvas.width,gl.canvas.height)
+		gl.useProgram(pass2program)
+		gl.uniform2f(pass2ResolutionUniformLocation,gl.canvas.width,gl.canvas.height)
+		gl.enableVertexAttribArray(pass2PositionAttributeLocation)
+		gl.bindBuffer(gl.ARRAY_BUFFER,pass2PositionBuffer)
+		gl.bufferData(gl.ARRAY_BUFFER,positions,gl.STATIC_DRAW)
+		gl.vertexAttribPointer(pass2PositionAttributeLocation,2,gl.FLOAT,false,0,0)
+		gl.drawArrays(gl.TRIANGLES,0,6)
+	}
+	var pass2Update=function(){
+		if(checkCanvasSize()||pass1Updated){
+			pass2Paint()
+		}
+	}
+	var init=function(){
+		gl.clearColor(0,0,0,1)
+		gl.clear(gl.COLOR_BUFFER_BIT)
+	}
+	var animation=function(){
+		pass1Update()
+		pass2Update()
+		requestAnimationFrame(animation)
+	}
+	image.addEventListener("load",function(){
+		setupTexture(gl,pass1Texture,image,0)
+		pass1Init()
+	})
+	init()
+	animation()
+	gui.addColor(this,"pass1BackgroundColor").onChange(function(){pass1UpdateColors()}).name("BackgroundColor")
+	gui.addColor(this,"pass1ForegroundColor").onChange(function(){pass1UpdateColors()}).name("ForegroundColor")
+	gui.add(this,"pass1UpdateInterval",1,60,1).name("UpdateInterval")
+	gui.add(this,"pass2Zoom",0.5,2,0.01).onChange(function(){pass2UpdateZoom()}).name("Zooom")
+	gui.add(this,"pass1Init").name("Refresh")
+	//]]>
+</script>
+</html>
