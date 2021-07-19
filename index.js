@@ -37,7 +37,7 @@ var goToBoard=function(name){
 	document.body.classList.add("loading")
 	isTransition=true
 	fillData(name,function(){
-		isTransition=true
+		isTransition=false
 		document.body.classList.remove("loading")
 		if(name!=""){
 			document.getElementById("item-"+name).classList.add("current")
