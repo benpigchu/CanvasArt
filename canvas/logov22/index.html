@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>logov22</title>
+</head>
+<style>
+	html{background:#000;background-origin:50%,50%;background-position:50%,50%}
+	body,html,#background,#canvas{height:100%;width:100%}
+	*{margin:0;padding:0}
+	#background{position:fixed;overflow:none}
+	#canvas{position:absolute}
+	#logo{position:absolute;width:240px;height:240px;background-size:240px;z-index:1;left:0;right:0;top:0;bottom:0;margin:auto}
+</style>
+<body>
+	<div id="background">
+		<canvas id="canvas"></canvas>
+	</div>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+<script>
+	//<![CDATA[
+	var gui=new dat.GUI()
+	const systemVar={}
+	systemVar.isMobile=(navigator.userAgent.match(/Android/i)?true:false)||(navigator.userAgent.match(/BlackBerry/i)?true:false)||(navigator.userAgent.match(/iPhone|iPad|iPod/i)?true:false)||(navigator.userAgent.match(/IEMobile/i)?true:false)
+	// const
+	const cellSize=120
+	const cellWidth=16
+	const cellHeight=12
+	const cellCount=cellWidth*cellHeight
+	const patternWidth=cellSize*cellWidth
+	const patternHeight=cellSize*cellHeight
+	const rectPositions=new Float32Array([-1,-1,-1,1,1,-1,1,-1,-1,1,1,1])
+	const orientationMap={
+		0:[[1,0,0],[0,-1,0]],
+		90:[[0,-1,0],[-1,0,0]],
+		180:[[-1,0,0],[0,1,0]],
+		270:[[0,1,0],[1,0,0]],
+	}
+	const canvas=document.getElementById("canvas")
+	const gl=canvas.getContext("webgl")
+	// util
+	const getRotatedZ=(x,y,z,beta,gamma)=>{
+		return (z*Math.cos(beta*Math.PI/180)+y*Math.sin(beta*Math.PI/180))*Math.cos(gamma*Math.PI/180)-x*Math.sin(gamma*Math.PI/180)
+	}
+	const checkCanvasSize=()=>{
+		if(canvas.width!==window.innerWidth||canvas.height!==window.innerHeight){
+			canvas.width=window.innerWidth
+			canvas.height=window.innerHeight
+			return true
+		}
+		return false
+	}
+	const makeShader=(code,type)=>{
+		const shader=gl.createShader(type)
+		gl.shaderSource(shader,code)
+		gl.compileShader(shader)
+		if(gl.getShaderParameter(shader,gl.COMPILE_STATUS)){
+			return shader
+		}else if(gl.isContextLost()){
+			// silently fail for context lost
+			return null
+		}else{
+			let error=new Error("shader init failed: "+gl.getShaderInfoLog(shader))
+			gl.deleteShader(shader)
+			throw error
+		}
+	}
+	const makeProgram=function(vertex,fragment){
+		const program=gl.createProgram()
+		gl.attachShader(program,vertex)
+		gl.attachShader(program,fragment)
+		gl.linkProgram(program)
+		if(gl.getProgramParameter(program,gl.LINK_STATUS)){
+			return program
+		}else if(gl.isContextLost()){
+			// silently fail for context lost
+			return null
+		}else{
+			let error=new Error("program init failed: "+gl.getProgramInfoLog(program))
+			gl.deleteProgram(program)
+			throw error
+		}
+	}
+	const setupFbTexture=(fb,tex,id,width,height)=>{
+		gl.bindFramebuffer(gl.FRAMEBUFFER,fb)
+		gl.activeTexture(gl["TEXTURE"+id])
+		gl.bindTexture(gl.TEXTURE_2D,tex)
+		// we do not use power of 2 texture
+		gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST)
+		gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST)
+		gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,null)
+		gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0)
+	}
+	// pass
+	const pass1=(()=>{
+		const vertex=[
+		"precision highp float;",
+		"attribute vec2 a_position;",
+		"uniform vec2 u_dimension;",
+		"attribute vec2 a_cell;",
+		"attribute float a_flip;",
+		"attribute float a_light;",
+		"varying vec2 v_position;",
+		"varying float v_flip;",
+		"varying float v_light;",
+		"void main(){",
+		"    vec2 interval=vec2(1.0,1.0)/u_dimension;",
+		"    vec2 base=interval*a_cell;",
+		"    vec2 pos=base*2.0+(a_position+vec2(1.0,1.0))*interval-vec2(1.0,1.0);",
+		"    gl_Position=vec4(pos,0,1);",
+		"    v_position=a_position;",
+		"    v_flip=a_flip;",
+		"    v_light=a_light;",
+		"}",
+		].join("\n")
+		const fragment=[
+		"precision highp float;",
+		"varying vec2 v_position;",
+		"varying float v_flip;",
+		"varying float v_light;",
+		"uniform vec3 u_nodeColor;",
+		"uniform vec3 u_lightColor;",
+		"uniform vec3 u_frameColor;",
+		"uniform float u_nodeSize;",
+		"uniform float u_frameSize;",
+		"uniform float u_lightWidth;",
+		"uniform float u_lightLength;",
+		"void main(){",
+		"    vec2 pos=(v_flip<0.5)?v_position:v_position*vec2(-1.0,1.0);",
+		"    bool node=abs(pos.x+pos.y)>2.0-2.0*u_nodeSize/120.0-0.001;",
+		"    bool frame=abs(pos.x-pos.y)<2.0*u_frameSize/120.0-0.001;",
+		"    bool light=(abs(pos.x+pos.y+v_light)<2.0*u_lightLength/120.0-0.001)&&(abs(pos.x-pos.y)<2.0*u_lightWidth*u_frameSize/120.0-0.001);",
+		"    vec3 color=node?u_nodeColor:",
+		"               light?u_lightColor:",
+		"               frame?u_frameColor:vec3(0.0,0.0,0.0);",
+		"    gl_FragColor=vec4(color*0.75,(node||frame)?1.0:0.0);",
+		"}",
+		].join("\n")
+		const allRectPositions=(()=>{
+			const result=new Float32Array(rectPositions.length*cellCount)
+			for(let i=0;i<cellCount;i++){
+				result.set(rectPositions,rectPositions.length*i)
+			}
+			return result
+		})()
+		const allCells=(()=>{
+			const result=new Float32Array(12*cellCount)
+			for(let y=0;y<cellHeight;y++){
+				for(let x=0;x<cellWidth;x++){
+					const i=x+y*cellWidth
+					for(let z=0;z<6;z++){
+						result[12*i+2*z]=x
+						result[12*i+2*z+1]=y
+					}
+				}
+			}
+			return result
+		})()
+		const allFlips=(()=>{
+			const result=new Float32Array(6*cellCount)
+			for(let y=0;y<cellHeight;y++){
+				for(let x=0;x<cellWidth;x++){
+					const i=x+y*cellWidth
+					result.fill((x+y)%2,6*i,6*i+6)
+				}
+			}
+			return result
+		})()
+		let patternFB
+		let program
+		let positionAL
+		let positionBuf
+		let dimensionUL
+		let nodeColorUL
+		let lightColorUL
+		let frameColorUL
+		let nodeSizeUL
+		let frameSizeUL
+		let lightWidthUL
+		let lightLengthUL
+		let cellAL
+		let cellBuf
+		let flipAL
+		let flipBuf
+		let lightAL
+		let lightBuf
+		return {
+			nodeColor:[255,255*0.5,0],
+			lightColor:[255,255*0.5,0],
+			frameColor:[255*0.25,255*0.25,255*0.25],
+			nodeSize:32,
+			frameSize:16,
+			lightWidth:0.5,
+			lightLength:24,
+			init:(appPatternFB)=>{
+				patternFB=appPatternFB
+				program=makeProgram(makeShader(vertex,gl.VERTEX_SHADER),makeShader(fragment,gl.FRAGMENT_SHADER))
+				gl.useProgram(program)
+				dimensionUL=gl.getUniformLocation(program,"u_dimension")
+				gl.uniform2f(dimensionUL,cellWidth,cellHeight)
+				nodeColorUL=gl.getUniformLocation(program,"u_nodeColor")
+				lightColorUL=gl.getUniformLocation(program,"u_lightColor")
+				frameColorUL=gl.getUniformLocation(program,"u_frameColor")
+				pass1.updateColor()
+				nodeSizeUL=gl.getUniformLocation(program,"u_nodeSize")
+				frameSizeUL=gl.getUniformLocation(program,"u_frameSize")
+				lightWidthUL=gl.getUniformLocation(program,"u_lightWidth")
+				lightLengthUL=gl.getUniformLocation(program,"u_lightLength")
+				pass1.updateSize()
+				positionAL=gl.getAttribLocation(program,"a_position")
+				positionBuf=gl.createBuffer()
+				gl.bindBuffer(gl.ARRAY_BUFFER,positionBuf)
+				gl.bufferData(gl.ARRAY_BUFFER,allRectPositions,gl.STATIC_DRAW)
+				cellAL=gl.getAttribLocation(program,"a_cell")
+				cellBuf=gl.createBuffer()
+				gl.bindBuffer(gl.ARRAY_BUFFER,cellBuf)
+				gl.bufferData(gl.ARRAY_BUFFER,allCells,gl.STATIC_DRAW)
+				flipAL=gl.getAttribLocation(program,"a_flip")
+				flipBuf=gl.createBuffer()
+				gl.bindBuffer(gl.ARRAY_BUFFER,flipBuf)
+				gl.bufferData(gl.ARRAY_BUFFER,allFlips,gl.STATIC_DRAW)
+				lightAL=gl.getAttribLocation(program,"a_light")
+				lightBuf=gl.createBuffer()
+			},
+			updateColor:()=>{
+				gl.useProgram(program)
+				gl.uniform3fv(nodeColorUL,pass1.nodeColor.map(v=>v/255))
+				gl.uniform3fv(lightColorUL,pass1.lightColor.map(v=>v/255))
+				gl.uniform3fv(frameColorUL,pass1.frameColor.map(v=>v/255))
+			},
+			updateSize:()=>{
+				gl.useProgram(program)
+				gl.uniform1f(nodeSizeUL,pass1.nodeSize)
+				gl.uniform1f(frameSizeUL,pass1.frameSize)
+				gl.uniform1f(lightWidthUL,pass1.lightWidth)
+				gl.uniform1f(lightLengthUL,pass1.lightLength)
+			},
+			draw:(lights)=>{
+				gl.useProgram(program)
+				gl.bindFramebuffer(gl.FRAMEBUFFER,patternFB)
+				gl.viewport(0,0,patternWidth,patternHeight)
+				gl.enableVertexAttribArray(positionAL)
+				gl.bindBuffer(gl.ARRAY_BUFFER,positionBuf)
+				gl.vertexAttribPointer(positionAL,2,gl.FLOAT,false,0,0)
+				gl.enableVertexAttribArray(cellAL)
+				gl.bindBuffer(gl.ARRAY_BUFFER,cellBuf)
+				gl.vertexAttribPointer(cellAL,2,gl.FLOAT,false,0,0)
+				gl.enableVertexAttribArray(flipAL)
+				gl.bindBuffer(gl.ARRAY_BUFFER,flipBuf)
+				gl.vertexAttribPointer(flipAL,1,gl.FLOAT,false,0,0)
+				gl.drawArrays(gl.TRIANGLES,0,6*cellCount)
+				gl.enableVertexAttribArray(lightAL)
+				gl.bindBuffer(gl.ARRAY_BUFFER,lightBuf)
+				gl.bufferData(gl.ARRAY_BUFFER,lights,gl.STATIC_DRAW)
+				gl.vertexAttribPointer(lightAL,1,gl.FLOAT,false,0,0)
+				gl.drawArrays(gl.TRIANGLES,0,6*cellCount)
+			}
+		}
+	})()
+	const pass2=(()=>{
+		const vertex=[
+		"attribute vec2 a_position;",
+		"void main(){",
+		"    gl_Position=vec4(a_position,0,1);",
+		"}",
+		].join("\n")
+		const fragment=[
+		"precision highp float;",
+		"uniform sampler2D u_image;",
+		"uniform vec2 u_resolution;",
+		"uniform float u_shift;",
+		"uniform vec2 u_texResolution;",
+		"uniform float u_zoom;",
+		"uniform float u_windowSize;",
+		"uniform vec3 u_windowColor;",
+		"uniform vec3 u_backgroundColor;",
+		"void main(){",
+		"    vec2 pos=(gl_FragCoord.xy-(u_resolution)/2.0)/u_zoom;",
+		"    vec2 backpos=mod(pos-2.0*vec2(0.0,u_shift),vec2(240.0,240.0));",
+		"    bool back=min(abs(backpos.x-119.5),abs(backpos.y-119.5))>(120.0-u_windowSize-0.0001);",
+		"    vec2 uv=(pos-vec2(0.0,u_shift))/u_texResolution+vec2(0.5,0.5);",
+		"    vec4 color=texture2D(u_image,mod(uv,1.0));",
+		"    gl_FragColor=color.a>0.5?color:back?vec4(u_windowColor,1.0):vec4(u_backgroundColor,1.0);",
+		"}",
+		].join("\n")
+		let program
+		let resolutionUL
+		let texResolutionUL
+		let zoomUL
+		let imageUL
+		let shiftUL
+		let windowColorUL
+		let backgroundColorUL
+		let windowSizeUL
+		let positionAL
+		let positionBuf
+		return {
+			zoom:1,
+			windowColor:[255*0.125,255*0.125,255*0.125],
+			backgroundColor:[0,0,0],
+			windowSize:60,
+			init:()=>{
+				program=makeProgram(makeShader(vertex,gl.VERTEX_SHADER),makeShader(fragment,gl.FRAGMENT_SHADER))
+				gl.useProgram(program)
+				resolutionUL=gl.getUniformLocation(program,"u_resolution")
+				gl.uniform2f(resolutionUL,gl.canvas.width,gl.canvas.height)
+				texResolutionUL=gl.getUniformLocation(program,"u_texResolution")
+				gl.uniform2f(texResolutionUL,patternWidth,patternHeight)
+				imageUL=gl.getUniformLocation(program,"u_image")
+				gl.uniform1i(imageUL,0)
+				shiftUL=gl.getUniformLocation(program,"u_shift")
+				gl.uniform1f(shiftUL,0)
+				zoomUL=gl.getUniformLocation(program,"u_zoom")
+				pass2.updateZoom()
+				windowColorUL=gl.getUniformLocation(program,"u_windowColor")
+				backgroundColorUL=gl.getUniformLocation(program,"u_backgroundColor")
+				pass2.updateColor()
+				windowSizeUL=gl.getUniformLocation(program,"u_windowSize")
+				pass2.updateSize()
+				positionAL=gl.getAttribLocation(program,"a_position")
+				positionBuf=gl.createBuffer()
+				gl.bindBuffer(gl.ARRAY_BUFFER,positionBuf)
+				gl.bufferData(gl.ARRAY_BUFFER,rectPositions,gl.STATIC_DRAW)
+			},
+			updateZoom:()=>{
+				gl.useProgram(program)
+				gl.uniform1f(zoomUL,pass2.zoom)
+			},
+			updateColor:()=>{
+				gl.useProgram(program)
+				gl.uniform3fv(windowColorUL,pass2.windowColor.map(v=>v/255))
+				gl.uniform3fv(backgroundColorUL,pass2.backgroundColor.map(v=>v/255))
+			},
+			updateSize:()=>{
+				gl.useProgram(program)
+				gl.uniform1f(windowSizeUL,pass2.windowSize)
+			},
+			draw:(resetSize,shift)=>{
+				gl.useProgram(program)
+				if(resetSize){
+					gl.uniform2f(resolutionUL,gl.canvas.width,gl.canvas.height)
+				}
+				gl.bindFramebuffer(gl.FRAMEBUFFER,null)
+				gl.viewport(0,0,gl.canvas.width,gl.canvas.height)
+				gl.uniform1f(shiftUL,shift)
+				gl.enableVertexAttribArray(positionAL)
+				gl.bindBuffer(gl.ARRAY_BUFFER,positionBuf)
+				gl.vertexAttribPointer(positionAL,2,gl.FLOAT,false,0,0)
+				gl.drawArrays(gl.TRIANGLES,0,6)
+			}
+		}
+	})()
+	// app
+	const bga=(()=>{
+		const renderInterval=1
+		let shift=0
+		let lastTime
+		let nextDraw
+		let patternFB
+		let patternTex
+		let deltaX=0
+		let deltaY=0
+		let lightCycles=new Array(cellCount).fill(null)
+		let lights=new Array(cellCount).fill(null)
+		let allLights=new Float32Array(6*cellCount)
+		return {
+			minSpeed:120,
+			maxSpeed:180,
+			lightSpeed:12,
+			minLightInterval:150,
+			maxLightInterval:180,
+			start:()=>{
+				canvas.addEventListener("webglcontextlost",()=>{
+					cancelAnimationFrame(nextDraw)
+				})
+				canvas.addEventListener("webglcontextrestored",()=>{
+					bga.init()
+				})
+				if(!systemVar.isMobile){
+					addEventListener("mousemove",function(event){
+						deltaX=1-event.clientX*2/window.innerWidth
+						deltaY=1-event.clientY*2/window.innerHeight
+					})
+				}else{
+					addEventListener("deviceorientation",function(event){
+						deltaX=getRotatedZ(orientationMap[screen.orientation.angle][0][0],orientationMap[screen.orientation.angle][0][1],orientationMap[screen.orientation.angle][0][2],event.beta,event.gamma)
+						deltaY=getRotatedZ(orientationMap[screen.orientation.angle][1][0],orientationMap[screen.orientation.angle][1][1],orientationMap[screen.orientation.angle][1][2],event.beta,event.gamma)
+					})
+				}
+				lastTime=Date.now()
+				bga.init()
+			},
+			init:()=>{
+				gl.clearColor(0,0,0,1)
+				patternFB=gl.createFramebuffer()
+				patternTex=gl.createTexture()
+				setupFbTexture(patternFB,patternTex,0,patternWidth,patternHeight)
+				bga.resetLight()
+				pass1.init(patternFB)
+				pass2.init()
+				bga.draw(0)
+			},
+			resetLight:()=>{
+				lightCycles=lightCycles.map(()=>Math.random())
+				lights=lights.map((_,i)=>(Math.random()-0.5)*(lightCycles[i]*(bga.maxLightInterval-bga.minLightInterval)+bga.minLightInterval))
+			},
+			draw:(frameId)=>{
+				let nextFrameId=(frameId+1)%renderInterval
+				const resetSize=checkCanvasSize()
+				if(frameId===0){
+					const newTime=Date.now()
+					shift+=(newTime-lastTime)/1000*(bga.minSpeed+bga.maxSpeed-(bga.maxSpeed-bga.minSpeed)*deltaY)/2
+					shift%=patternHeight
+					for(let i=0;i<cellCount;i++){
+						let cycle=lightCycles[i]*(bga.maxLightInterval-bga.minLightInterval)+bga.minLightInterval
+						lights[i]+=(newTime-lastTime)/1000*bga.lightSpeed
+						lights[i]-=Math.round(lights[i]/cycle)*cycle
+						allLights.fill(lights[i],6*i,6*i+6)
+					}
+					lastTime=newTime
+					pass1.draw(allLights)
+					pass2.draw(resetSize,shift)
+				}else if(resetSize){
+					pass2.draw(resetSize,shift)
+				}
+				nextDraw=requestAnimationFrame(()=>bga.draw(nextFrameId))
+			},
+		}
+	})()
+	// start
+	bga.start()
+	gui.addColor(pass1,"nodeColor").onChange(()=>{pass1.updateColor()}).name("node")
+	gui.addColor(pass1,"lightColor").onChange(()=>{pass1.updateColor()}).name("light")
+	gui.addColor(pass1,"frameColor").onChange(()=>{pass1.updateColor()}).name("frame")
+	gui.addColor(pass2,"windowColor").onChange(()=>{pass2.updateColor()}).name("window")
+	gui.addColor(pass2,"backgroundColor").onChange(()=>{pass2.updateColor()}).name("background")
+	gui.add(pass1,"nodeSize",0,120,1).onChange(()=>{pass1.updateSize()})
+	gui.add(pass1,"frameSize",0,120,1).onChange(()=>{pass1.updateSize()})
+	gui.add(pass2,"windowSize",0,120,1).onChange(()=>{pass2.updateSize()})
+	gui.add(pass1,"lightWidth",0,1,0.01).onChange(()=>{pass1.updateSize()})
+	gui.add(pass1,"lightLength",0,120,1).onChange(()=>{pass1.updateSize()})
+	gui.add(bga,"lightSpeed",-48,48,1)
+	gui.add(bga,"minLightInterval",8,480,1)
+	gui.add(bga,"maxLightInterval",8,480,1)
+	gui.add(bga,"minSpeed",-300,300,1)
+	gui.add(bga,"maxSpeed",-300,300,1)
+	gui.add(pass2,"zoom",0.5,2,0.01).onChange(()=>{pass2.updateZoom()})
+	// gui
+	//]]>
+</script>
+</html>
