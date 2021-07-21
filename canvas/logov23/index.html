@@ -1,18 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<meta http-equiv="X-UA-Compatible" content="ie=edge">
-	<title>logov22</title>
+	<title>logov23</title>
 </head>
 <style>
-	html{background:#000;background-origin:50%,50%;background-position:50%,50%}
+	html{background:#000;background-position:50%,50%}
 	body,html,#background,#canvas{height:100%;width:100%}
 	*{margin:0;padding:0}
 	#background{position:fixed;overflow:none}
 	#canvas{position:absolute}
-	#logo{position:absolute;width:240px;height:240px;background-size:240px;z-index:1;left:0;right:0;top:0;bottom:0;margin:auto}
 </style>
 <body>
 	<div id="background">
@@ -103,42 +102,67 @@
 		"attribute vec2 a_position;",
 		"uniform vec2 u_dimension;",
 		"attribute vec2 a_cell;",
-		"attribute float a_flip;",
-		"attribute float a_light;",
+		"attribute vec2 a_node;",
+		"attribute vec2 a_lnode;",
+		"attribute vec2 a_rnode;",
+		"attribute vec2 a_tnode;",
+		"attribute vec2 a_ltnode;",
+		"attribute vec2 a_rtnode;",
 		"varying vec2 v_position;",
-		"varying float v_flip;",
-		"varying float v_light;",
+		"varying vec2 v_node;",
+		"varying vec2 v_lnode;",
+		"varying vec2 v_rnode;",
+		"varying vec2 v_tnode;",
+		"varying vec2 v_ltnode;",
+		"varying vec2 v_rtnode;",
 		"void main(){",
 		"    vec2 interval=vec2(1.0,1.0)/u_dimension;",
 		"    vec2 base=interval*a_cell;",
 		"    vec2 pos=base*2.0+(a_position+vec2(1.0,1.0))*interval-vec2(1.0,1.0);",
 		"    gl_Position=vec4(pos,0,1);",
 		"    v_position=a_position;",
-		"    v_flip=a_flip;",
-		"    v_light=a_light;",
+		"    v_node=a_node;",
+		"    v_lnode=a_lnode;",
+		"    v_rnode=a_rnode;",
+		"    v_tnode=a_tnode;",
+		"    v_ltnode=a_ltnode;",
+		"    v_rtnode=a_rtnode;",
 		"}",
 		].join("\n")
 		const fragment=[
 		"precision highp float;",
 		"varying vec2 v_position;",
-		"varying float v_flip;",
-		"varying float v_light;",
-		"uniform vec3 u_nodeColor;",
-		"uniform vec3 u_lightColor;",
-		"uniform vec3 u_frameColor;",
-		"uniform float u_nodeSize;",
-		"uniform float u_frameSize;",
-		"uniform float u_lightWidth;",
-		"uniform float u_lightLength;",
+		"varying vec2 v_node;",
+		"varying vec2 v_lnode;",
+		"varying vec2 v_rnode;",
+		"varying vec2 v_tnode;",
+		"varying vec2 v_ltnode;",
+		"varying vec2 v_rtnode;",
+		"uniform vec3 u_background;"+
+		"uniform vec3 u_foreground;"+
+		"uniform float u_gradientSize;",
 		"void main(){",
-		"    vec2 pos=(v_flip<0.5)?v_position:v_position*vec2(-1.0,1.0);",
-		"    bool node=abs(pos.x+pos.y)>2.0-2.0*u_nodeSize/120.0-0.001;",
-		"    bool frame=abs(pos.x-pos.y)<2.0*u_frameSize/120.0-0.001;",
-		"    bool light=(abs(pos.x+pos.y+v_light)<2.0*u_lightLength/120.0-0.001)&&(abs(pos.x-pos.y)<2.0*u_lightWidth*u_frameSize/120.0-0.001);",
-		"    vec3 color=node?u_nodeColor:",
-		"               light?u_lightColor:",
-		"               frame?u_frameColor:vec3(0.0,0.0,0.0);",
-		"    gl_FragColor=vec4(color*0.75,(node||frame)?1.0:0.0);",
+		"    float dcy=v_node.y-v_position.y;",
+		"    float dly=v_lnode.y-v_position.y;",
+		"    float dry=v_rnode.y-v_position.y;",
+		"    bool left=v_node.x>v_position.x;",
+		"    float dyl=left?dly:dcy;",
+		"    float dyr=left?dcy:dry;",
+		"    float dxl=left?(v_position.x+2.-v_lnode.x):(v_position.x-v_node.x);",
+		"    float dxr=left?(v_node.x-v_position.x):(2.+v_rnode.x-v_position.x);",
+		"    float dy=dyl+(dyr-dyl)*dxl/(dxl+dxr);",
+		"    float dtcy=v_tnode.y-v_position.y;",
+		"    float dtly=v_ltnode.y-v_position.y;",
+		"    float dtry=v_rtnode.y-v_position.y;",
+		"    bool tleft=v_tnode.x>v_position.x;",
+		"    float dtyl=tleft?dtly:dtcy;",
+		"    float dtyr=tleft?dtcy:dtry;",
+		"    float dtxl=tleft?(v_position.x+2.-v_ltnode.x):(v_position.x-v_tnode.x);",
+		"    float dtxr=tleft?(v_tnode.x-v_position.x):(2.+v_rtnode.x-v_position.x);",
+		"    float dty=dtyl+(dtyr-dtyl)*dtxl/(dtxl+dtxr);",
+		"    float d=dy>0.?dy:(2.0+dty);",
+		"    float ratio=d>u_gradientSize?0.:((u_gradientSize-d)/u_gradientSize);",
+		"    gl_FragColor=vec4(ratio*u_foreground+(1.-ratio)*u_background,1.0);",
 		"}",
 		].join("\n")
 		const allRectPositions=(()=>{
@@ -161,57 +185,43 @@
 			}
 			return result
 		})()
-		const allFlips=(()=>{
-			const result=new Float32Array(6*cellCount)
-			for(let y=0;y<cellHeight;y++){
-				for(let x=0;x<cellWidth;x++){
-					const i=x+y*cellWidth
-					result.fill((x+y)%2,6*i,6*i+6)
-				}
-			}
-			return result
-		})()
 		let patternFB
 		let program
 		let positionAL
 		let positionBuf
 		let dimensionUL
-		let nodeColorUL
-		let lightColorUL
-		let frameColorUL
-		let nodeSizeUL
-		let frameSizeUL
-		let lightWidthUL
-		let lightLengthUL
+		let backgroundUL
+		let foregroundUL
+		let gradientSizeUL
 		let cellAL
 		let cellBuf
-		let flipAL
-		let flipBuf
-		let lightAL
-		let lightBuf
+		let nodeAL
+		let nodeBuf
+		let lnodeAL
+		let lnodeBuf
+		let rnodeAL
+		let rnodeBuf
+		let tnodeAL
+		let tnodeBuf
+		let ltnodeAL
+		let ltnodeBuf
+		let rtnodeAL
+		let rtnodeBuf
 		return {
-			nodeColor:[255,255*0.5,0],
-			lightColor:[255,255*0.5,0],
-			frameColor:[255*0.25,255*0.25,255*0.25],
-			nodeSize:32,
-			frameSize:16,
-			lightWidth:0.5,
-			lightLength:24,
+			gradientSize:2,
+			backgroundColor:[0,0,0],
+			foregroundColor:[255*0.75,255*0.375,0],
 			init:(appPatternFB)=>{
 				patternFB=appPatternFB
 				program=makeProgram(makeShader(vertex,gl.VERTEX_SHADER),makeShader(fragment,gl.FRAGMENT_SHADER))
 				gl.useProgram(program)
 				dimensionUL=gl.getUniformLocation(program,"u_dimension")
 				gl.uniform2f(dimensionUL,cellWidth,cellHeight)
-				nodeColorUL=gl.getUniformLocation(program,"u_nodeColor")
-				lightColorUL=gl.getUniformLocation(program,"u_lightColor")
-				frameColorUL=gl.getUniformLocation(program,"u_frameColor")
+				backgroundUL=gl.getUniformLocation(program,"u_background")
+				foregroundUL=gl.getUniformLocation(program,"u_foreground")
 				pass1.updateColor()
-				nodeSizeUL=gl.getUniformLocation(program,"u_nodeSize")
-				frameSizeUL=gl.getUniformLocation(program,"u_frameSize")
-				lightWidthUL=gl.getUniformLocation(program,"u_lightWidth")
-				lightLengthUL=gl.getUniformLocation(program,"u_lightLength")
-				pass1.updateSize()
+				gradientSizeUL=gl.getUniformLocation(program,"u_gradientSize")
+				pass1.updategradientSize()
 				positionAL=gl.getAttribLocation(program,"a_position")
 				positionBuf=gl.createBuffer()
 				gl.bindBuffer(gl.ARRAY_BUFFER,positionBuf)
@@ -220,27 +230,29 @@
 				cellBuf=gl.createBuffer()
 				gl.bindBuffer(gl.ARRAY_BUFFER,cellBuf)
 				gl.bufferData(gl.ARRAY_BUFFER,allCells,gl.STATIC_DRAW)
-				flipAL=gl.getAttribLocation(program,"a_flip")
-				flipBuf=gl.createBuffer()
-				gl.bindBuffer(gl.ARRAY_BUFFER,flipBuf)
-				gl.bufferData(gl.ARRAY_BUFFER,allFlips,gl.STATIC_DRAW)
-				lightAL=gl.getAttribLocation(program,"a_light")
-				lightBuf=gl.createBuffer()
+				nodeAL=gl.getAttribLocation(program,"a_node")
+				nodeBuf=gl.createBuffer()
+				lnodeAL=gl.getAttribLocation(program,"a_lnode")
+				lnodeBuf=gl.createBuffer()
+				rnodeAL=gl.getAttribLocation(program,"a_rnode")
+				rnodeBuf=gl.createBuffer()
+				tnodeAL=gl.getAttribLocation(program,"a_tnode")
+				tnodeBuf=gl.createBuffer()
+				ltnodeAL=gl.getAttribLocation(program,"a_ltnode")
+				ltnodeBuf=gl.createBuffer()
+				rtnodeAL=gl.getAttribLocation(program,"a_rtnode")
+				rtnodeBuf=gl.createBuffer()
 			},
 			updateColor:()=>{
 				gl.useProgram(program)
-				gl.uniform3fv(nodeColorUL,pass1.nodeColor.map(v=>v/255))
-				gl.uniform3fv(lightColorUL,pass1.lightColor.map(v=>v/255))
-				gl.uniform3fv(frameColorUL,pass1.frameColor.map(v=>v/255))
+				gl.uniform3fv(backgroundUL,pass1.backgroundColor.map(v=>v/255))
+				gl.uniform3fv(foregroundUL,pass1.foregroundColor.map(v=>v/255))
 			},
-			updateSize:()=>{
+			updategradientSize:()=>{
 				gl.useProgram(program)
-				gl.uniform1f(nodeSizeUL,pass1.nodeSize)
-				gl.uniform1f(frameSizeUL,pass1.frameSize)
-				gl.uniform1f(lightWidthUL,pass1.lightWidth)
-				gl.uniform1f(lightLengthUL,pass1.lightLength)
+				gl.uniform1f(gradientSizeUL,pass1.gradientSize)
 			},
-			draw:(lights)=>{
+			draw:({allNodes,allLNodes,allRNodes,allTNodes,allRTNodes,allLTNodes})=>{
 				gl.useProgram(program)
 				gl.bindFramebuffer(gl.FRAMEBUFFER,patternFB)
 				gl.viewport(0,0,patternWidth,patternHeight)
@@ -250,20 +262,37 @@
 				gl.enableVertexAttribArray(cellAL)
 				gl.bindBuffer(gl.ARRAY_BUFFER,cellBuf)
 				gl.vertexAttribPointer(cellAL,2,gl.FLOAT,false,0,0)
-				gl.enableVertexAttribArray(flipAL)
-				gl.bindBuffer(gl.ARRAY_BUFFER,flipBuf)
-				gl.vertexAttribPointer(flipAL,1,gl.FLOAT,false,0,0)
-				gl.drawArrays(gl.TRIANGLES,0,6*cellCount)
-				gl.enableVertexAttribArray(lightAL)
-				gl.bindBuffer(gl.ARRAY_BUFFER,lightBuf)
-				gl.bufferData(gl.ARRAY_BUFFER,lights,gl.STATIC_DRAW)
-				gl.vertexAttribPointer(lightAL,1,gl.FLOAT,false,0,0)
+				gl.enableVertexAttribArray(nodeAL)
+				gl.bindBuffer(gl.ARRAY_BUFFER,nodeBuf)
+				gl.bufferData(gl.ARRAY_BUFFER,allNodes,gl.STATIC_DRAW)
+				gl.vertexAttribPointer(nodeAL,2,gl.FLOAT,false,0,0)
+				gl.enableVertexAttribArray(lnodeAL)
+				gl.bindBuffer(gl.ARRAY_BUFFER,lnodeBuf)
+				gl.bufferData(gl.ARRAY_BUFFER,allLNodes,gl.STATIC_DRAW)
+				gl.vertexAttribPointer(lnodeAL,2,gl.FLOAT,false,0,0)
+				gl.enableVertexAttribArray(rnodeAL)
+				gl.bindBuffer(gl.ARRAY_BUFFER,rnodeBuf)
+				gl.bufferData(gl.ARRAY_BUFFER,allRNodes,gl.STATIC_DRAW)
+				gl.vertexAttribPointer(rnodeAL,2,gl.FLOAT,false,0,0)
+				gl.enableVertexAttribArray(tnodeAL)
+				gl.bindBuffer(gl.ARRAY_BUFFER,tnodeBuf)
+				gl.bufferData(gl.ARRAY_BUFFER,allTNodes,gl.STATIC_DRAW)
+				gl.vertexAttribPointer(tnodeAL,2,gl.FLOAT,false,0,0)
+				gl.enableVertexAttribArray(ltnodeAL)
+				gl.bindBuffer(gl.ARRAY_BUFFER,ltnodeBuf)
+				gl.bufferData(gl.ARRAY_BUFFER,allLTNodes,gl.STATIC_DRAW)
+				gl.vertexAttribPointer(ltnodeAL,2,gl.FLOAT,false,0,0)
+				gl.enableVertexAttribArray(rtnodeAL)
+				gl.bindBuffer(gl.ARRAY_BUFFER,rtnodeBuf)
+				gl.bufferData(gl.ARRAY_BUFFER,allRTNodes,gl.STATIC_DRAW)
+				gl.vertexAttribPointer(rtnodeAL,2,gl.FLOAT,false,0,0)
 				gl.drawArrays(gl.TRIANGLES,0,6*cellCount)
 			}
 		}
 	})()
 	const pass2=(()=>{
 		const vertex=[
+		"precision highp float;",
 		"attribute vec2 a_position;",
 		"void main(){",
 		"    gl_Position=vec4(a_position,0,1);",
@@ -276,34 +305,23 @@
 		"uniform float u_shift;",
 		"uniform vec2 u_texResolution;",
 		"uniform float u_zoom;",
-		"uniform float u_windowSize;",
-		"uniform vec3 u_windowColor;",
-		"uniform vec3 u_backgroundColor;",
 		"void main(){",
 		"    vec2 pos=(gl_FragCoord.xy-(u_resolution)/2.0)/u_zoom;",
-		"    vec2 backpos=mod(pos-2.0*vec2(0.0,u_shift),vec2(240.0,240.0));",
-		"    bool back=min(abs(backpos.x-119.5),abs(backpos.y-119.5))>(120.0-u_windowSize-0.0001);",
-		"    vec2 uv=(pos-vec2(0.0,u_shift))/u_texResolution+vec2(0.5,0.5);",
-		"    vec4 color=texture2D(u_image,mod(uv,1.0));",
-		"    gl_FragColor=color.a>0.5?color:back?vec4(u_windowColor,1.0):vec4(u_backgroundColor,1.0);",
+		"    vec2 uv=(pos+vec2(0.0,u_shift))/u_texResolution+vec2(0.5,0.5);",
+		"    vec4 color=texture2D(u_image,mod(-uv,1.0));",
+		"    gl_FragColor=color;",
 		"}",
 		].join("\n")
 		let program
 		let resolutionUL
 		let texResolutionUL
-		let zoomUL
 		let imageUL
 		let shiftUL
-		let windowColorUL
-		let backgroundColorUL
-		let windowSizeUL
+		let zoomUL
 		let positionAL
 		let positionBuf
 		return {
 			zoom:1,
-			windowColor:[255*0.125,255*0.125,255*0.125],
-			backgroundColor:[0,0,0],
-			windowSize:60,
 			init:()=>{
 				program=makeProgram(makeShader(vertex,gl.VERTEX_SHADER),makeShader(fragment,gl.FRAGMENT_SHADER))
 				gl.useProgram(program)
@@ -317,11 +335,6 @@
 				gl.uniform1f(shiftUL,0)
 				zoomUL=gl.getUniformLocation(program,"u_zoom")
 				pass2.updateZoom()
-				windowColorUL=gl.getUniformLocation(program,"u_windowColor")
-				backgroundColorUL=gl.getUniformLocation(program,"u_backgroundColor")
-				pass2.updateColor()
-				windowSizeUL=gl.getUniformLocation(program,"u_windowSize")
-				pass2.updateSize()
 				positionAL=gl.getAttribLocation(program,"a_position")
 				positionBuf=gl.createBuffer()
 				gl.bindBuffer(gl.ARRAY_BUFFER,positionBuf)
@@ -330,15 +343,6 @@
 			updateZoom:()=>{
 				gl.useProgram(program)
 				gl.uniform1f(zoomUL,pass2.zoom)
-			},
-			updateColor:()=>{
-				gl.useProgram(program)
-				gl.uniform3fv(windowColorUL,pass2.windowColor.map(v=>v/255))
-				gl.uniform3fv(backgroundColorUL,pass2.backgroundColor.map(v=>v/255))
-			},
-			updateSize:()=>{
-				gl.useProgram(program)
-				gl.uniform1f(windowSizeUL,pass2.windowSize)
 			},
 			draw:(resetSize,shift)=>{
 				gl.useProgram(program)
@@ -365,15 +369,22 @@
 		let patternTex
 		let deltaX=0
 		let deltaY=0
-		let lightCycles=new Array(cellCount).fill(null)
-		let lights=new Array(cellCount).fill(null)
-		let allLights=new Float32Array(6*cellCount)
+		let nodes=new Array(cellCount).fill(null)
+		const allNodes=new Float32Array(12*cellCount)
+		const allLNodes=new Float32Array(12*cellCount)
+		const allRNodes=new Float32Array(12*cellCount)
+		const allTNodes=new Float32Array(12*cellCount)
+		const allLTNodes=new Float32Array(12*cellCount)
+		const allRTNodes=new Float32Array(12*cellCount)
 		return {
-			minSpeed:120,
-			maxSpeed:180,
-			lightSpeed:12,
-			minLightInterval:150,
-			maxLightInterval:180,
+			minSpeed:50,
+			maxSpeed:150,
+			nodeOffsetX:0.5,
+			nodeOffsetY:0.5,
+			minCycleX:10,
+			maxCycleX:15,
+			minCycleY:10,
+			maxCycleY:15,
 			start:()=>{
 				canvas.addEventListener("webglcontextlost",()=>{
 					cancelAnimationFrame(nextDraw)
@@ -400,58 +411,82 @@
 				patternFB=gl.createFramebuffer()
 				patternTex=gl.createTexture()
 				setupFbTexture(patternFB,patternTex,0,patternWidth,patternHeight)
-				bga.resetLight()
 				pass1.init(patternFB)
 				pass2.init()
+				bga.resetNodes()
 				bga.draw(0)
 			},
-			resetLight:()=>{
-				lightCycles=lightCycles.map(()=>Math.random())
-				lights=lights.map((_,i)=>(Math.random()-0.5)*(lightCycles[i]*(bga.maxLightInterval-bga.minLightInterval)+bga.minLightInterval))
+			resetNodes:()=>{
+				nodes=nodes.map(()=>({
+					cycleX:Math.random(),
+					cycleY:Math.random(),
+					phaseX:Math.random(),
+					phaseY:Math.random(),
+				}))
 			},
 			draw:(frameId)=>{
-				let nextFrameId=(frameId+1)%renderInterval
+				const nextFrameId=(frameId+1)%renderInterval
 				const resetSize=checkCanvasSize()
 				if(frameId===0){
 					const newTime=Date.now()
 					shift+=(newTime-lastTime)/1000*(bga.minSpeed+bga.maxSpeed-(bga.maxSpeed-bga.minSpeed)*deltaY)/2
 					shift%=patternHeight
-					for(let i=0;i<cellCount;i++){
-						let cycle=lightCycles[i]*(bga.maxLightInterval-bga.minLightInterval)+bga.minLightInterval
-						lights[i]+=(newTime-lastTime)/1000*bga.lightSpeed
-						lights[i]-=Math.round(lights[i]/cycle)*cycle
-						allLights.fill(lights[i],6*i,6*i+6)
+					for(let y=0;y<cellHeight;y++){
+						for(let x=0;x<cellWidth;x++){
+							const i=x+y*cellWidth
+							const node=nodes[i]
+							node.phaseX+=(newTime-lastTime)/1000/(bga.minCycleX+(bga.maxCycleX-bga.minCycleX)*node.cycleX)
+							node.phaseX%=1
+							node.phaseY+=(newTime-lastTime)/1000/(bga.minCycleY+(bga.maxCycleY-bga.minCycleY)*node.cycleY)
+							node.phaseY%=1
+							const nodePos=[
+								Math.sin(Math.PI*2*node.phaseX)*bga.nodeOffsetX,
+								Math.sin(Math.PI*2*node.phaseY)*bga.nodeOffsetY,
+							]
+							for(let k=0;k<6;k++){
+								const lx=(x+cellWidth-1)%cellWidth
+								const rx=(x+1)%cellWidth
+								const by=(y+cellHeight-1)%cellHeight
+								const li=lx+y*cellWidth
+								const ri=rx+y*cellWidth
+								const lbi=lx+by*cellWidth
+								const bi=x+by*cellWidth
+								const rbi=rx+by*cellWidth
+								allNodes.set(nodePos,12*i+2*k)
+								allRNodes.set(nodePos,12*li+2*k)
+								allLNodes.set(nodePos,12*ri+2*k)
+								allTNodes.set(nodePos,12*bi+2*k)
+								allRTNodes.set(nodePos,12*lbi+2*k)
+								allLTNodes.set(nodePos,12*rbi+2*k)
+							}
+						}
 					}
 					lastTime=newTime
-					pass1.draw(allLights)
+					pass1.draw({allNodes,allLNodes,allRNodes,allTNodes,allRTNodes,allLTNodes})
 					pass2.draw(resetSize,shift)
 				}else if(resetSize){
 					pass2.draw(resetSize,shift)
 				}
 				nextDraw=requestAnimationFrame(()=>bga.draw(nextFrameId))
-			},
+			}
 		}
 	})()
 	// start
 	bga.start()
 	// gui
-	gui.addColor(pass1,"nodeColor").onChange(()=>{pass1.updateColor()}).name("node")
-	gui.addColor(pass1,"lightColor").onChange(()=>{pass1.updateColor()}).name("light")
-	gui.addColor(pass1,"frameColor").onChange(()=>{pass1.updateColor()}).name("frame")
-	gui.addColor(pass2,"windowColor").onChange(()=>{pass2.updateColor()}).name("window")
-	gui.addColor(pass2,"backgroundColor").onChange(()=>{pass2.updateColor()}).name("background")
-	gui.add(pass1,"nodeSize",0,120,1).onChange(()=>{pass1.updateSize()})
-	gui.add(pass1,"frameSize",0,120,1).onChange(()=>{pass1.updateSize()})
-	gui.add(pass2,"windowSize",0,120,1).onChange(()=>{pass2.updateSize()})
-	gui.add(pass1,"lightWidth",0,1,0.01).onChange(()=>{pass1.updateSize()})
-	gui.add(pass1,"lightLength",0,120,1).onChange(()=>{pass1.updateSize()})
-	gui.add(bga,"lightSpeed",-48,48,1)
-	gui.add(bga,"minLightInterval",8,480,1)
-	gui.add(bga,"maxLightInterval",8,480,1)
+	gui.addColor(pass1,"backgroundColor").onChange(()=>{pass1.updateColor()}).name("background")
+	gui.addColor(pass1,"foregroundColor").onChange(()=>{pass1.updateColor()}).name("foreground")
+	gui.add(pass1,"gradientSize",0,4,0.01).onChange(()=>{pass1.updategradientSize()})
+	gui.add(bga,"nodeOffsetX",0,1)
+	gui.add(bga,"nodeOffsetY",0,1)
 	gui.add(bga,"minSpeed",-300,300,1)
 	gui.add(bga,"maxSpeed",-300,300,1)
+	gui.add(bga,"minCycleX",1,30,1)
+	gui.add(bga,"maxCycleX",1,30,1)
+	gui.add(bga,"minCycleY",1,30,1)
+	gui.add(bga,"maxCycleY",1,30,1)
 	gui.add(pass2,"zoom",0.5,2,0.01).onChange(()=>{pass2.updateZoom()})
-	gui.add(bga,"resetLight").name("rerollLight")
+	gui.add(bga,"resetNodes").name("rerollNodes")
 	//]]>
 </script>
 </html>
